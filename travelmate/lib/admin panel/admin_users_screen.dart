@@ -47,7 +47,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse("http://192.168.0.103:5000/api/admin/users"),
+        Uri.parse("http://192.168.100.59:5000/api/admin/users"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
@@ -79,7 +79,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Future<void> deleteUser(String id) async {
     try {
       final response = await http.delete(
-        Uri.parse("http://192.168.0.103:5000/api/admin/delete-user/$id"),
+        Uri.parse("http://192.168.100.59:5000/api/admin/delete-user/$id"),
         headers: {"Authorization": "Bearer $token"},
       );
 
@@ -97,32 +97,41 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Future<void> blockUser(String id) async {
-    try {
-      final response = await http.post(
-        Uri.parse("http://192.168.0.103:5000/api/admin/block-user/$id"),
-        headers: {"Authorization": "Bearer $token"},
-      );
+  try {
+    final response = await http.post(
+      Uri.parse("http://192.168.100.59:5000/api/admin/block-user/$id"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+    );
 
-      if (response.statusCode == 200) {
-        setState(() {
-          users = users.map((user) {
-            if (user["_id"] == id) user["isBlocked"] = true;
-            return user;
-          }).toList();
-        });
-        showSnackBar("User blocked successfully.");
-      } else {
-        showSnackBar("Failed to block user.");
-      }
-    } catch (e) {
-      showSnackBar("Error blocking user.");
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      setState(() {
+        users = users.map((user) {
+          if (user["_id"] == id) {
+            user["isBlocked"] = true;
+          }
+          return user;
+        }).toList();
+      });
+
+      showSnackBar("User blocked successfully.");
+    } else {
+      print("Block failed: ${response.statusCode} ${response.body}");
+      showSnackBar("Failed to block user.");
     }
+  } catch (e) {
+    print("Block exception: $e");
+    showSnackBar("Error blocking user.");
   }
+}
+
 
   Future<void> unBlockUser(String id) async {
     try {
       final response = await http.post(
-        Uri.parse("http://192.168.0.103:5000/api/admin/unblock-user/$id"),
+        Uri.parse("http://192.168.100.59:5000/api/admin/unblock-user/$id"),
         headers: {"Authorization": "Bearer $token"},
       );
 

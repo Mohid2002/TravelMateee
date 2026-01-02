@@ -47,6 +47,9 @@ dependencies:
   lottie: ^2.7.0
   weather_icons: ^3.0.0
   shared_preferences: ^2.1.1
+  workmanager: ^0.5.2
+  flutter_local_notifications: ^13.0.0
+  timezone: ^0.9.0
   
 dev_dependencies:
   flutter_test:
