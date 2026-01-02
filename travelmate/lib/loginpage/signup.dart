@@ -65,7 +65,7 @@ class _SignUpPageState extends State<SignUpPage> {
     });
 
     try {
-      var url = Uri.parse("http://192.168.0.103:5000/api/user/signup");
+      var url = Uri.parse("http://192.168.100.59:5000/api/user/signup");
       var response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
