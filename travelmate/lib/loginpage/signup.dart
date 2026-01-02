@@ -65,7 +65,7 @@ class _SignUpPageState extends State<SignUpPage> {
     });
 
     try {
-      var url = Uri.parse("http://192.168.0.103/api/user/signup");
+      var url = Uri.parse("http://192.168.0.103:5000/api/user/signup");
       var response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
@@ -99,14 +99,15 @@ class _SignUpPageState extends State<SignUpPage> {
           SnackBar(content: Text(data['message'] ?? "Signup failed")),
         );
       }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Something went wrong: $e")),
-      );
-    }
+    } catch (e, stack) {
+  setState(() => _isLoading = false);
+  debugPrint("SIGNUP ERROR: $e");
+  debugPrint("STACK TRACE: $stack");
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text("Network error: $e")),
+  );
+}
   }
 
   @override

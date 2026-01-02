@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:travelmate/homescreen/calander_schedule.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -30,44 +31,34 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString('token'); // must be stored at login
+      String? token = prefs.getString('token');
 
       if (token == null) {
-        debugPrint("❌ Token not found. Please login first.");
         setState(() => isLoading = false);
         return;
       }
 
       final response = await http.get(
-        Uri.parse('http://192.168.0.103/api/user/basic-info'), // your API
+        Uri.parse('http://192.168.0.103/api/user/basic-info'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
         },
       );
 
-      debugPrint("STATUS CODE: ${response.statusCode}");
-      debugPrint("RESPONSE BODY: ${response.body}");
-
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+        final data = jsonDecode(response.body);
 
-        // Safely get name and email
-        final name = data['name'] ??
-    data['data']?['name'] ??
-    data['user']?['name'];
-final email = data['email'] ??
-    data['data']?['email'] ??
-    data['user']?['email'];
+        final name =
+            data['name'] ?? data['data']?['name'] ?? data['user']?['name'];
+        final email =
+            data['email'] ?? data['data']?['email'] ?? data['user']?['email'];
 
-nameController.text = name?.toString() ?? '';
-emailController.text = email?.toString() ?? '';
-
-      } else {
-        debugPrint("❌ API error: ${response.statusCode}");
+        nameController.text = name?.toString() ?? '';
+        emailController.text = email?.toString() ?? '';
       }
     } catch (e) {
-      debugPrint("❌ Exception: $e");
+      debugPrint("❌ Error: $e");
     } finally {
       setState(() => isLoading = false);
     }
@@ -80,46 +71,26 @@ emailController.text = email?.toString() ?? '';
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(height * 0.09),
-        child: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: true,
-          leading: Padding(
-            padding: EdgeInsets.only(top: height * 0.02),
-            child: const BackButton(color: Colors.black),
+      appBar: AppBar(
+        title: const Text("Profile", style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
+        actions: [
+          TextButton(
+            onPressed: () {
+              if (_formKey.currentState!.validate()) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Profile Updated")),
+                );
+              }
+            },
+            child: const Text("Done",
+                style: TextStyle(color: Colors.blue, fontSize: 16)),
           ),
-          title: Padding(
-            padding: EdgeInsets.only(top: height * 0.02),
-            child: const Text(
-              "Profile",
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          actions: [
-            Padding(
-              padding: EdgeInsets.only(top: height * 0.02, right: width * 0.03),
-              child: TextButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Profile Updated")),
-                    );
-                  }
-                },
-                child: const Text(
-                  "Done",
-                  style: TextStyle(color: Colors.blue, fontSize: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
+
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -130,25 +101,72 @@ emailController.text = email?.toString() ?? '';
               child: Form(
                 key: _formKey,
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    SizedBox(height: height * 0.02),
+                    SizedBox(height: 50,),
                     const CircleAvatar(
                       radius: 50,
                       backgroundImage: AssetImage("assets/img1.png"),
                     ),
-                    SizedBox(height: height * 0.015),
+
+                    const SizedBox(height: 10),
+
                     TextButton(
                       onPressed: () {},
-                      child: const Text(
-                        "Change Profile Picture",
-                        style: TextStyle(color: Colors.blue),
-                      ),
+                      child: const Text("Change Profile Picture",
+                          style: TextStyle(color: Colors.blue)),
                     ),
-                    SizedBox(height: height * 0.03),
-                    _buildTextField("Name", nameController, TextInputType.name),
-                    SizedBox(height: height * 0.02),
+
+                    const SizedBox(height: 25),
+
+                    _buildTextField(
+                        "Name", nameController, TextInputType.name),
+
+                    const SizedBox(height: 20),
+
                     _buildTextField(
                         "Email", emailController, TextInputType.emailAddress),
+
+                    const SizedBox(height: 30),
+
+                    /// ✅ MY SCHEDULED TRIPS BUTTON
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const CalendarSchedule(),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.calendar_month,
+                                color: Colors.blue),
+                            SizedBox(width: 8),
+                            Text(
+                              "My Scheduled Trips",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -342,28 +342,36 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () async {
-                        DateTime now = DateTime.now();
-                        DateTime? pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate: now,
-                          firstDate: now,
-                          lastDate: DateTime(now.year + 5),
-                        );
-                        if (pickedDate != null) {
-                          savedTrips.add(
-                            TripModel(
-                              image: widget.place['imageUrl'],
-                              name: widget.place['name'],
-                              location: widget.place['location'],
-                              date: pickedDate,
-                            ),
-                          );
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const CalendarSchedule()),
-                          );
-                        }
-                      },
+  DateTime now = DateTime.now();
+
+  DateTime? pickedDate = await showDatePicker(
+    context: context,
+    initialDate: now,
+    firstDate: now,
+    lastDate: DateTime(now.year + 5),
+  );
+
+  if (pickedDate != null) {
+    savedTrips.add(
+      TripModel(
+        image: widget.place['imageUrl'],
+        name: widget.place['name'],
+        location: widget.place['location'],
+        date: pickedDate,
+        history: widget.place['history'], // ✅ REQUIRED
+        lat: (widget.place['lat'] ?? 31.5880).toDouble(), // ✅ REQUIRED
+        lon: (widget.place['lon'] ?? 74.3109).toDouble(), // ✅ REQUIRED
+      ),
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const CalendarSchedule(),
+      ),
+    );
+  }
+},
                       child: const Text("Schedule a Trip", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                     ),
                   ),

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:travelmate/loginpage/loginpage.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -46,7 +47,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse("http://192.168.100.59:5000/api/admin/users"),
+        Uri.parse("http://192.168.0.103:5000/api/admin/users"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
@@ -78,7 +79,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Future<void> deleteUser(String id) async {
     try {
       final response = await http.delete(
-        Uri.parse("http://192.168.0.108:5000/api/admin/delete-user/$id"),
+        Uri.parse("http://192.168.0.103:5000/api/admin/delete-user/$id"),
         headers: {"Authorization": "Bearer $token"},
       );
 
@@ -98,7 +99,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Future<void> blockUser(String id) async {
     try {
       final response = await http.post(
-        Uri.parse("http://192.168.0.108:5000/api/admin/block-user/$id"),
+        Uri.parse("http://192.168.0.103:5000/api/admin/block-user/$id"),
         headers: {"Authorization": "Bearer $token"},
       );
 
@@ -121,7 +122,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Future<void> unBlockUser(String id) async {
     try {
       final response = await http.post(
-        Uri.parse("http://192.168.0.108:5000/api/admin/unblock-user/$id"),
+        Uri.parse("http://192.168.0.103:5000/api/admin/unblock-user/$id"),
         headers: {"Authorization": "Bearer $token"},
       );
 
@@ -147,6 +148,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     );
   }
 
+  Future<void> logout() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove("admin_token");
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()), // your login page
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -154,95 +164,116 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         title: const Text("Admin Panel - Users"),
         backgroundColor: Colors.blue,
       ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator(color: Colors.blue))
-          : error
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 80, color: Colors.grey),
-                      const SizedBox(height: 10),
-                      const Text(
-                        "Failed to load users 😞",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 5),
-                      ElevatedButton(
-                        onPressed: fetchUsers,
-                        child: const Text("Retry"),
-                      ),
-                    ],
-                  ),
-                )
-              : users.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.person_off, size: 80, color: Colors.grey),
-                          SizedBox(height: 10),
-                          Text(
-                            "No Users Found",
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: users.length,
-                      itemBuilder: (context, index) {
-                        final user = users[index];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: user["isBlocked"] == true
-                                  ? Colors.redAccent
-                                  : Colors.green,
-                              child: Text(
-                                user["name"] != null && user["name"].isNotEmpty
-                                    ? user["name"][0].toUpperCase()
-                                    : "?",
-                                style: const TextStyle(color: Colors.white),
-                              ),
+      body: Column(
+        children: [
+          Expanded(
+            child: loading
+                ? const Center(child: CircularProgressIndicator(color: Colors.blue))
+                : error
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 80, color: Colors.grey),
+                            const SizedBox(height: 10),
+                            const Text(
+                              "Failed to load users 😞",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
-                            title: Text(user["name"] ?? "No Name"),
-                            subtitle: Text(user["email"] ?? "No Email"),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Block / Unblock
-                                IconButton(
-                                  icon: Icon(
-                                    user["isBlocked"] == true
-                                        ? Icons.lock_open
-                                        : Icons.lock,
-                                    color: user["isBlocked"] == true
-                                        ? Colors.green
-                                        : Colors.red,
-                                  ),
-                                  onPressed: () {
-                                    user["isBlocked"] == true
-                                        ? unBlockUser(user["_id"])
-                                        : blockUser(user["_id"]);
-                                  },
-                                ),
-                                // Delete
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => deleteUser(user["_id"]),
+                            const SizedBox(height: 5),
+                            ElevatedButton(
+                              onPressed: fetchUsers,
+                              child: const Text("Retry"),
+                            ),
+                          ],
+                        ),
+                      )
+                    : users.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                Icon(Icons.person_off, size: 80, color: Colors.grey),
+                                SizedBox(height: 10),
+                                Text(
+                                  "No Users Found",
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
+                          )
+                        : ListView.builder(
+                            itemCount: users.length,
+                            itemBuilder: (context, index) {
+                              final user = users[index];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                elevation: 4,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: user["isBlocked"] == true
+                                        ? Colors.redAccent
+                                        : Colors.green,
+                                    child: Text(
+                                      user["name"] != null && user["name"].isNotEmpty
+                                          ? user["name"][0].toUpperCase()
+                                          : "?",
+                                      style: const TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                  title: Text(user["name"] ?? "No Name"),
+                                  subtitle: Text(user["email"] ?? "No Email"),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: Icon(
+                                          user["isBlocked"] == true
+                                              ? Icons.lock_open
+                                              : Icons.lock,
+                                          color: user["isBlocked"] == true
+                                              ? Colors.green
+                                              : Colors.red,
+                                        ),
+                                        onPressed: () {
+                                          user["isBlocked"] == true
+                                              ? unBlockUser(user["_id"])
+                                              : blockUser(user["_id"]);
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete, color: Colors.red),
+                                        onPressed: () => deleteUser(user["_id"]),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
-                    ),
+          ),
+          // Logout button at bottom
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.logout),
+                label: const Text("Logout"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: logout,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
