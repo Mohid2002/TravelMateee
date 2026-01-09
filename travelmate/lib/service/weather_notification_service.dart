@@ -7,7 +7,7 @@ class WeatherNotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
-  /// INIT
+  /// INIT (CALL IN main.dart)
   static Future<void> init() async {
     tz.initializeTimeZones();
 
@@ -19,42 +19,35 @@ class WeatherNotificationService {
     await _notifications.initialize(settings);
   }
 
-  /// SCHEDULE HOURLY WEATHER (12 PM → 12 AM)
-  static Future<void> scheduleHourlyLahoreWeather() async {
+  /// ❌ CANCEL ALL NOTIFICATIONS
+  static Future<void> cancelAll() async {
+    await _notifications.cancelAll();
+  }
+
+  /// 🔔 PLACE BASED WEATHER NOTIFICATION
+  static Future<void> scheduleHourlyWeather({
+    required String placeName,
+    required double lat,
+    required double lon,
+  }) async {
     await _notifications.cancelAll();
 
     final now = tz.TZDateTime.now(tz.local);
 
-    // Start from 12 PM today
-    tz.TZDateTime startTime = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      12,
-    );
+    for (int i = 1; i <= 12; i++) {
+      final scheduledTime = now.add(Duration(hours: i));
 
-    // If already past 12 PM, start next hour
-    if (now.isAfter(startTime)) {
-      startTime = startTime.add(const Duration(hours: 1));
-    }
-
-    int notificationId = 0;
-
-    // Schedule until 12 AM
-    while (startTime.hour >= 12 && startTime.hour <= 23) {
-      final weather =
-          await WeatherService.getWeatherByLocation(31.5204, 74.3587);
+      final weather = await WeatherService.getWeatherByLocation(lat, lon);
 
       await _notifications.zonedSchedule(
-        notificationId++,
-        "Lahore Weather Update 🌤",
+        i,
+        "$placeName Weather 🌤",
         "${weather.temp.toStringAsFixed(1)}°C • ${weather.description}",
-        startTime,
+        tz.TZDateTime.from(scheduledTime, tz.local),
         const NotificationDetails(
           android: AndroidNotificationDetails(
             'weather_channel',
-            'Hourly Weather',
+            'Trip Weather',
             importance: Importance.high,
             priority: Priority.high,
           ),
@@ -63,8 +56,6 @@ class WeatherNotificationService {
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
       );
-
-      startTime = startTime.add(const Duration(hours: 1));
     }
   }
 }

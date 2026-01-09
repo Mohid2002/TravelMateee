@@ -46,7 +46,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final url = Uri.parse("http://192.168.0.103:5000/api/password/reset-password");
+      final url = Uri.parse("http://192.168.100.59:5000/api/password/reset-password");
 
       final response = await http.post(
         url,

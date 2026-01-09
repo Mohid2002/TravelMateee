@@ -59,9 +59,9 @@ class _LoginPageState extends State<LoginPage> {
 
       /// 🔥 Decide API by email
       if (email.toLowerCase() == adminEmail) {
-        apiUrl = "http://192.168.100.59:5000/api/admin/login";
+        apiUrl = "http://192.168.0.104:5000/api/admin/login";
       } else {
-        apiUrl = "http://192.168.100.59:5000/api/user/login";
+        apiUrl = "http://192.168.0.104:5000/api/user/login";
       }
 
       var response = await http.post(

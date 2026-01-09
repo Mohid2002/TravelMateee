@@ -7,34 +7,26 @@ import 'package:travelmate/homescreen/viwe_all_page.dart';
 import 'package:travelmate/loginpage/loginpage.dart';
 import 'package:travelmate/model/weather_model.dart';
 import 'package:travelmate/service/weather_service.dart';
+import 'package:travelmate/homescreen/trip_model.dart';
+import 'package:travelmate/service/weather_notification_service.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
+/// ---------------- WEATHER HELPERS ----------------
 IconData _getWeatherIcon(String condition) {
   final c = condition.toLowerCase();
-
   if (c.contains("rain")) return Icons.umbrella;
   if (c.contains("cloud")) return Icons.cloud;
   if (c.contains("mist") || c.contains("fog")) return Icons.blur_on;
   if (c.contains("snow")) return Icons.ac_unit;
   if (c.contains("clear")) return Icons.wb_sunny;
-
   return Icons.wb_cloudy;
 }
 
 Color _getWeatherColor(String condition) {
   final c = condition.toLowerCase();
-
   if (c.contains("rain")) return Colors.blue.shade100;
   if (c.contains("cloud")) return Colors.grey.shade200;
   if (c.contains("mist") || c.contains("fog")) return Colors.blueGrey.shade100;
   if (c.contains("clear")) return Colors.orange.shade50;
-
   return Colors.grey.shade100;
 }
 
@@ -43,7 +35,16 @@ bool _isNight() {
   return hour >= 18 || hour <= 5;
 }
 
+/// ---------------- HOME SCREEN ----------------
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
 class _HomeScreenState extends State<HomeScreen> {
+  /// ---------------- DESTINATIONS ----------------
   final List<Map<String, dynamic>> destinations = [
     {
       "name": "Badshahi Mosque",
@@ -97,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
       "history_ur":
           "وزیر خان مسجد 1634 میں شاہ جہاں کے دور میں تعمیر کی گئی۔ اسے حکیم علم الدین انصاری المعروف وزیر خان نے بنوایا۔ مسجد کی دیواروں پر شاندار ٹائل ورک اور فارسی خطاطی موجود ہے۔ یہ لاہور کا ایک اہم مذہبی اور ثقافتی مرکز رہی ہے۔",
     },
+
     {
       "name": "Sheesh Mahal",
       "location": "Lahore",
@@ -177,126 +179,196 @@ class _HomeScreenState extends State<HomeScreen> {
     },
   ];
 
+  /// ---------------- NOTIFICATIONS ----------------
   List<String> notifications = [];
-  Timer? _weatherTimer;
+
+  /// ---------------- WEATHER STATE ----------------
+  WeatherModel? currentWeather;
+  bool isLoadingWeather = false;
+
+  /// Last notified location
+  String? _lastNotifiedPlace;
 
   @override
   void initState() {
     super.initState();
     _loadNotifications();
-    _startWeatherNotifications();
-  }
-
-  @override
-  void dispose() {
-    _weatherTimer?.cancel();
-    super.dispose();
+    _autoRefreshWeather(); // automatic weather updates
   }
 
   void _loadNotifications() {
+    notifications = ["Welcome to TravelMate!"];
+  }
+
+  /// ---------------- AUTO WEATHER REFRESH ----------------
+  Future<void> _autoRefreshWeather() async {
+    WeatherModel? previousWeather;
+
+    while (mounted) {
+      try {
+        final weather = await _getHomeWeather();
+
+        // Check if weather actually changed
+        if (previousWeather == null ||
+            weather.temp != previousWeather.temp ||
+            weather.description != previousWeather.description ||
+            weather.city != previousWeather.city) {
+          setState(() {
+            currentWeather = weather;
+            notifications.add(
+              "Weather of ${weather.city}: ${weather.temp.toStringAsFixed(1)}°C",
+            );
+          });
+
+          previousWeather = weather;
+
+          // Schedule notifications only if location changed
+          if (savedTrips.isNotEmpty) {
+            final trip = savedTrips.first;
+            _updateWeatherNotification(
+              weather.city,
+              trip.lat, // use trip coordinates
+              trip.lon,
+            );
+          } else {
+            // default location (Lahore)
+            _updateWeatherNotification(weather.city, 31.5204, 74.3587);
+          }
+
+          print("Weather refreshed at ${DateTime.now()} for ${weather.city}");
+        }
+      } catch (e) {
+        setState(() {
+          notifications.add("Weather update failed");
+        });
+      }
+
+      await Future.delayed(const Duration(seconds: 2000)); // your interval
+    }
+  }
+
+  /// ---------------- GET HOME WEATHER ----------------
+  Future<WeatherModel> _getHomeWeather() {
+    if (savedTrips.isNotEmpty) {
+      final trip = savedTrips.first;
+      return WeatherService.getWeatherByLocation(trip.lat, trip.lon);
+    }
+    return WeatherService.getWeatherByLocation(
+      31.5204,
+      74.3587,
+    ); // Lahore default
+  }
+
+  /// ---------------- MANUAL REFRESH ----------------
+  Future<void> _refreshWeather() async {
     setState(() {
-      notifications = ["Welcome to TravelMate!"];
+      isLoadingWeather = true;
     });
-  }
 
-  void _startWeatherNotifications() {
-  _weatherTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
-    if (!mounted) return; // safety check
     try {
-      final weather =
-          await WeatherService.getWeatherByLocation(31.5204, 74.3587);
-      String message =
-          "The weather of Lahore is ${weather.temp.toStringAsFixed(1)}°C • ${weather.description}";
+      final weather = await _getHomeWeather();
       setState(() {
-        notifications.add(message);
+        currentWeather = weather;
+        notifications.add(
+          "Weather of ${weather.city}: ${weather.temp.toStringAsFixed(1)}°C",
+        );
       });
-    } catch (e) {
+
+      // Schedule notifications on manual refresh
+      if (savedTrips.isNotEmpty) {
+        final trip = savedTrips.first;
+        _updateWeatherNotification(
+          weather.city,
+          trip.lat, // use trip coordinates
+          trip.lon,
+        );
+      } else {
+        // default location (Lahore)
+        _updateWeatherNotification(weather.city, 31.5204, 74.3587);
+      }
+    } catch (_) {
       setState(() {
-        notifications.add("Weather update failed: $e");
+        notifications.add("Weather refresh failed");
+      });
+    } finally {
+      setState(() {
+        isLoadingWeather = false;
       });
     }
-  });
-}
-
-
-  String _createWeatherNotification(WeatherModel weather) {
-    final desc = weather.description.toLowerCase();
-    if (desc.contains("rain")) {
-      return "It's raining in ${weather.city}! Don't forget your umbrella ☔";
-    } else if (desc.contains("snow")) {
-      return "Snowfall alert in ${weather.city}! ❄️";
-    } else if (weather.temp > 35) {
-      return "Heat alert in ${weather.city}: ${weather.temp.toStringAsFixed(1)}°C 🌞";
-    }
-    return "";
   }
 
- void _showNotifications() {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text("Notifications"),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: notifications.isEmpty
-            ? const Text("No new notifications")
-            : ListView.builder(
-                shrinkWrap: true,
-                itemCount: notifications.length,
-                itemBuilder: (context, index) {
-                  final item = notifications[index];
-                  return Dismissible(
-                    key: Key(item + index.toString()),
-                    direction: DismissDirection.endToStart,
-                    onDismissed: (_) {
-                      setState(() {
-                        notifications.removeAt(index);
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Notification removed"),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                    },
-                    background: Container(
-                      color: Colors.red,
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 20),
-                      child: const Icon(Icons.delete, color: Colors.white),
-                    ),
-                    child: ListTile(
-                      leading: const Icon(Icons.notifications),
-                      title: Text(item),
-                      onTap: () {
-                        // Remove notification when clicked
-                        setState(() {
-                          notifications.removeAt(index);
-                        });
-                        Navigator.pop(context); // Close the dialog if you want
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Notification opened"),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
+  /// ---------------- UPDATE WEATHER NOTIFICATION ----------------
+  void _updateWeatherNotification(String placeName, double lat, double lon) {
+    if (_lastNotifiedPlace != placeName) {
+      _lastNotifiedPlace = placeName;
+      WeatherNotificationService.scheduleHourlyWeather(
+        placeName: placeName,
+        lat: lat,
+        lon: lon,
+      );
+    }
+  }
+
+  /// ---------------- NOTIFICATION DIALOG ----------------
+  void _showNotifications() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Notifications"),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: notifications.isEmpty
+              ? const Text("No notifications")
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: notifications.length,
+                  itemBuilder: (context, index) {
+                    final item = notifications[index];
+                    return Dismissible(
+                      key: Key(item + index.toString()),
+                      direction: DismissDirection.endToStart,
+                      onDismissed: (_) {
+                        setState(() => notifications.removeAt(index));
                       },
-                    ),
-                  );
-                },
-              ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Close"),
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.notifications),
+                        title: Text(item),
+                        onTap: () {
+                          setState(
+                            () => notifications.removeAt(index),
+                          ); // remove notification
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CalendarSchedule(
+                                tripIndexFromNotification:
+                                    0, // pass the index you want to reschedule
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
         ),
-      ],
-    ),
-  );
-}
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
+    );
+  }
 
-
+  /// ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -305,384 +377,311 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.grey[100],
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: width * 0.05),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 25),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        PopupMenuButton(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          onSelected: (value) {
-                            if (value == "logout") {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const LoginPage(),
-                                ),
-                              );
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: "logout",
-                              child: Row(
-                                children: [
-                                  Icon(Icons.logout, color: Colors.red),
-                                  SizedBox(width: 10),
-                                  Text("Logout"),
-                                ],
-                              ),
-                            ),
-                          ],
-                          child: const CircleAvatar(
-                            radius: 18,
-                            backgroundImage: AssetImage("assets/resot.png"),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Stack(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade200,
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.notifications_none,
-                                  size: 20,
-                                  color: Colors.black,
-                                ),
-                                onPressed: _showNotifications,
-                              ),
-                            ),
-                            if (notifications.isNotEmpty)
-                              Positioned(
-                                right: 4,
-                                top: 4,
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Text(
-                                    "${notifications.length}",
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 10),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const SearchPage(),
-                                ),
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.search,
-                              color: Colors.black,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.blue,
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const CalendarSchedule(),
-                                ),
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.calendar_today,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                SizedBox(height: width * 0.07),
-                const Text(
-                  "Explore the\nBeautiful world!",
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
+          padding: EdgeInsets.symmetric(horizontal: width * 0.05),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 25),
+              _buildTopBar(),
+              const SizedBox(height: 25),
+              const Text(
+                "Explore the\nBeautiful world!",
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 15),
+              isLoadingWeather
+                  ? const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: CircularProgressIndicator(),
+                    )
+                  : currentWeather == null
+                  ? const Text("Weather unavailable")
+                  : _buildWeatherCard(currentWeather!),
+              const SizedBox(height: 30),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Best Destination",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
-                const SizedBox(height: 7),
-                FutureBuilder<WeatherModel>(
-                  future: WeatherService.getWeatherByLocation(31.5204, 74.3587),
-                  builder: (context, snapshot) {
-                    final isLoading =
-                        snapshot.connectionState == ConnectionState.waiting;
-                    final hasError = snapshot.hasError;
-                    final weather = snapshot.data;
-                    final isNight = _isNight();
-                    final condition = weather?.description ?? "";
-
-                    return Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 18,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isNight
-                            ? Colors.indigo.shade200
-                            : _getWeatherColor(condition),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: isLoading
-                          ? Row(
-                              children: const [
-                                CircularProgressIndicator(),
-                                SizedBox(width: 15),
-                                Text("Loading weather..."),
-                              ],
-                            )
-                          : hasError
-                              ? const Text(
-                                  "Unable to load weather",
-                                  style: TextStyle(color: Colors.red),
-                                )
-                              : Row(
-                                  children: [
-                                    Icon(
-                                      isNight
-                                          ? Icons.nightlight_round
-                                          : _getWeatherIcon(condition),
-                                      size: 50,
-                                      color: isNight ? Colors.white : Colors.orange,
-                                    ),
-                                    const SizedBox(width: 20),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          weather!.city,
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color:
-                                                isNight ? Colors.white : Colors.black,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 5),
-                                        Text(
-                                          "${weather.temp.toStringAsFixed(1)}°C • ${weather.description}",
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color:
-                                                isNight ? Colors.white70 : Colors.black54,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 5),
-                                        Text(
-                                          "Feels like ${weather.feelsLike.toStringAsFixed(1)}°C",
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color:
-                                                isNight ? Colors.white60 : Colors.black45,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Best Destination",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ViewAllPage(destinations: destinations),
+                        ),
+                      );
+                    },
+                    child: const Text("View all"),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 15),
+              SizedBox(
+                height: width * 0.9,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: destinations.length,
+                  itemBuilder: (context, index) {
+                    final destination = destinations[index];
+                    return GestureDetector(
+                      onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                ViewAllPage(destinations: destinations),
+                                PlaceDetailScreen(place: destination),
                           ),
                         );
                       },
-                      child: const Text("View all"),
+                      child: _buildDestinationCard(destination, width),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeatherCard(WeatherModel weather) {
+    final night = _isNight();
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: night
+            ? Colors.indigo.shade200
+            : _getWeatherColor(weather.description),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            night
+                ? Icons.nightlight_round
+                : _getWeatherIcon(weather.description),
+            size: 50,
+            color: night ? Colors.white : Colors.orange,
+          ),
+          const SizedBox(width: 20),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                weather.city,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: night ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "${weather.temp.toStringAsFixed(1)}°C • ${weather.description}",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: night ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              Text(
+                "Feels like ${weather.feelsLike.toStringAsFixed(1)}°C",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: night ? Colors.white60 : Colors.black45,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            PopupMenuButton(
+              onSelected: (v) {
+                if (v == "logout") {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginPage()),
+                  );
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: "logout",
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, color: Colors.red),
+                      SizedBox(width: 10),
+                      Text("Logout"),
+                    ],
+                  ),
+                ),
+              ],
+              child: const CircleAvatar(
+                radius: 18,
+                backgroundImage: AssetImage("assets/resot.png"),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_none),
+                  onPressed: _showNotifications,
+                ),
+                if (notifications.isNotEmpty)
+                  Positioned(
+                    right: 4,
+                    top: 4,
+                    child: CircleAvatar(
+                      radius: 8,
+                      backgroundColor: Colors.red,
+                      child: Text(
+                        "${notifications.length}",
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _refreshWeather,
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SearchPage()),
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.calendar_today),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CalendarSchedule()),
+                );
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDestinationCard(Map<String, dynamic> destination, double width) {
+    return Container(
+      width: width * 0.6,
+      margin: const EdgeInsets.only(right: 15),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            child: Image.asset(
+              destination["imageUrl"],
+              height: width * 0.65,
+              width: double.infinity,
+              fit: BoxFit.fill,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  destination["name"],
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        destination["location"],
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(height: width * 0.07),
-                SizedBox(
-                  height: width * 0.9,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: destinations.length,
-                    itemBuilder: (context, index) {
-                      final destination = destinations[index];
-
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  PlaceDetailScreen(place: destination),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: width * 0.6,
-                          margin: const EdgeInsets.only(right: 15),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ClipRRect(
-                                borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(20),
-                                ),
-                                child: Image.asset(
-                                  destination["imageUrl"],
-                                  height: width * 0.65,
-                                  width: double.infinity,
-                                  fit: BoxFit.fill,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(10),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      destination["name"],
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.location_on,
-                                          size: 14,
-                                          color: Colors.grey,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: Text(
-                                            destination["location"],
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.star,
-                                              size: 14,
-                                              color: Colors.amber,
-                                            ),
-                                            Text(
-                                              " ${destination["rating"]}",
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        Row(
-                                          children: [
-                                            const CircleAvatar(
-                                              radius: 8,
-                                              backgroundImage:
-                                                  AssetImage('assets/resot.png'),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              "+${destination["visitors"]}",
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.star, size: 14, color: Colors.amber),
+                        Text(
+                          " ${destination["rating"]}",
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 8,
+                          backgroundImage: AssetImage('assets/resot.png'),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "+${destination["visitors"]}",
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }

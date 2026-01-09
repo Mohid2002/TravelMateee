@@ -59,25 +59,32 @@ class _TravelHomeScreenState extends State<TravelHomeScreen> {
 
             // 🗺️ Map icon with navigation
             InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MapScreen()),
-                );
-              },
-              child: Container(
-                padding: EdgeInsets.all(screenWidth * 0.035),
-                decoration: const BoxDecoration(
-                  color: Colors.blue,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.place,
-                  color: Colors.white,
-                  size: screenWidth * 0.07,
-                ),
-              ),
-            ),
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapScreen(
+          destLat: 31.5880,    // Default lat if no specific place
+          destLon: 74.3109,    // Default lon
+          destName: "Default Location",
+        ),
+      ),
+    );
+  },
+  child: Container(
+    padding: EdgeInsets.all(screenWidth * 0.035),
+    decoration: const BoxDecoration(
+      color: Colors.blue,
+      shape: BoxShape.circle,
+    ),
+    child: Icon(
+      Icons.place,
+      color: Colors.white,
+      size: screenWidth * 0.07,
+    ),
+  ),
+),
+
 
             _buildNavItem(Icons.bookmark_add, "Saved", 2, screenWidth),
             _buildNavItem(Icons.person, "Profile", 3, screenWidth),

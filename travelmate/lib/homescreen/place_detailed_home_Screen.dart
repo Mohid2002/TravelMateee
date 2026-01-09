@@ -4,9 +4,9 @@ import 'package:travelmate/homescreen/calander_schedule.dart';
 import 'package:travelmate/homescreen/trip_model.dart';
 import 'package:travelmate/service/weather_service.dart';
 import 'package:travelmate/model/weather_model.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:translator/translator.dart';
+import 'map_screen.dart'; // ✅ Import your MapScreen
 
 class PlaceDetailScreen extends StatefulWidget {
   final Map<String, dynamic> place;
@@ -24,18 +24,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   String urduHistory = "";
   bool isUrdu = false;
 
-  // 🌍 Open Google Maps
-  void _openMap(String location) async {
-    final Uri url =
-        Uri.parse("https://www.google.com/maps/search/?api=1&query=$location");
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      throw 'Could not launch $url';
-    }
-  }
-
-  // 🔊 Speak function
   Future<void> _speak(String text, String languageCode) async {
     await flutterTts.stop();
     await flutterTts.setLanguage(languageCode);
@@ -104,7 +92,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
 
-    // ✅ Get lat/lon safely (default Lahore)
     final double lat = (widget.place['lat'] ?? 31.5880).toDouble();
     final double lon = (widget.place['lon'] ?? 74.3109).toDouble();
 
@@ -112,7 +99,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Top Image
           SizedBox(
             height: height * 0.4,
             width: double.infinity,
@@ -121,8 +107,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
               fit: BoxFit.cover,
             ),
           ),
-
-          // Back button
           Positioned(
             top: 40,
             left: 16,
@@ -134,8 +118,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
               ),
             ),
           ),
-
-          // Bottom Section
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -155,7 +137,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Name + Location
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -190,8 +171,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-
-                  // English + Urdu buttons
                   Row(
                     children: [
                       GestureDetector(
@@ -218,8 +197,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-
-                  // History Section
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -249,12 +226,9 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-
-                  // Weather + Map
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Weather Container
                       FutureBuilder<WeatherModel>(
                         future: WeatherService.getWeatherByLocation(lat, lon),
                         builder: (context, snapshot) {
@@ -307,32 +281,44 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                         },
                       ),
 
+                      // ✅ Map Button: open internal MapScreen with route
                       // Map Button
-                      GestureDetector(
-                        onTap: () => _openMap(widget.place['location']),
-                        child: Container(
-                          width: width * 0.4,
-                          height: width * 0.25,
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(15),
-                            border: Border.all(color: Colors.blue.shade200, width: 1),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.map, color: Colors.blueAccent, size: 24),
-                              SizedBox(height: 6),
-                              Text("Get Directions", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                            ],
-                          ),
-                        ),
-                      ),
+GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapScreen(
+          destName: widget.place['name'],  // Destination name
+          destLat: (widget.place['lat'] ?? 31.5880).toDouble(), // Destination latitude
+          destLon: (widget.place['lon'] ?? 74.3109).toDouble(), // Destination longitude
+        ),
+      ),
+    );
+  },
+  child: Container(
+    width: width * 0.4,
+    height: width * 0.25,
+    decoration: BoxDecoration(
+      color: Colors.blue.shade50,
+      borderRadius: BorderRadius.circular(15),
+      border: Border.all(color: Colors.blue.shade200, width: 1),
+    ),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: const [
+        Icon(Icons.map, color: Colors.blueAccent, size: 24),
+        SizedBox(height: 6),
+        Text("Get Directions", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+      ],
+    ),
+  ),
+),
+
+
                     ],
                   ),
                   const SizedBox(height: 12),
-
-                  // Schedule Trip
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -342,37 +328,50 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () async {
-  DateTime now = DateTime.now();
+                        if (savedTrips.isNotEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("You already have an active trip. Delete it before scheduling a new one."),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
 
-  DateTime? pickedDate = await showDatePicker(
-    context: context,
-    initialDate: now,
-    firstDate: now,
-    lastDate: DateTime(now.year + 5),
-  );
+                        DateTime now = DateTime.now();
 
-  if (pickedDate != null) {
-    savedTrips.add(
-      TripModel(
-        image: widget.place['imageUrl'],
-        name: widget.place['name'],
-        location: widget.place['location'],
-        date: pickedDate,
-        history: widget.place['history'], // ✅ REQUIRED
-        lat: (widget.place['lat'] ?? 31.5880).toDouble(), // ✅ REQUIRED
-        lon: (widget.place['lon'] ?? 74.3109).toDouble(), // ✅ REQUIRED
-      ),
-    );
+                        DateTime? pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: now,
+                          firstDate: now,
+                          lastDate: DateTime(now.year + 5),
+                        );
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CalendarSchedule(),
-      ),
-    );
-  }
-},
-                      child: const Text("Schedule a Trip", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                        if (pickedDate != null) {
+                          savedTrips.add(
+                            TripModel(
+                              image: widget.place['imageUrl'],
+                              name: widget.place['name'],
+                              location: widget.place['location'],
+                              date: pickedDate,
+                              history: widget.place['history'],
+                              lat: (widget.place['lat'] ?? 31.5880).toDouble(),
+                              lon: (widget.place['lon'] ?? 74.3109).toDouble(),
+                            ),
+                          );
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CalendarSchedule(),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text(
+                        "Schedule a Trip",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
                     ),
                   ),
                 ],

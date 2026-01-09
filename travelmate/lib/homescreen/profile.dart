@@ -39,7 +39,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
 
       final response = await http.get(
-        Uri.parse('http://192.168.0.103/api/user/basic-info'),
+        Uri.parse('http://192.168.100.59/api/user/basic-info'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',

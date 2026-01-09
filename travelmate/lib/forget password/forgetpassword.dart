@@ -30,7 +30,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse("http://192.168.0.103:5000/api/password/send-otp");
+      final url = Uri.parse("http://192.168.100.59:5000/api/password/send-otp");
 
       final response = await http.post(
         url,

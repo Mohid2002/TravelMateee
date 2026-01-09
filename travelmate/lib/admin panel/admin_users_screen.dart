@@ -98,7 +98,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Future<void> blockUser(String id) async {
   try {
-    final response = await http.post(
+    final response = await http.patch(
       Uri.parse("http://192.168.100.59:5000/api/admin/block-user/$id"),
       headers: {
         "Authorization": "Bearer $token",
@@ -130,7 +130,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Future<void> unBlockUser(String id) async {
     try {
-      final response = await http.post(
+      final response = await http.patch(
         Uri.parse("http://192.168.100.59:5000/api/admin/unblock-user/$id"),
         headers: {"Authorization": "Bearer $token"},
       );

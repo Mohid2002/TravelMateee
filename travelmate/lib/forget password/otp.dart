@@ -17,7 +17,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       List.generate(4, (_) => TextEditingController());
 
   bool _isLoading = false;
-  final String baseUrl = "http://192.168.0.103:5000";
+  final String baseUrl = "http://192.168.100.59:5000";
 
   // Combine 4 boxes
   String _getEnteredOTP() {
